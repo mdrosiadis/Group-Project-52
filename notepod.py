@@ -1,3 +1,4 @@
+# pylint: disable = W0614
 import tkinter as tk
 import os
 from tkinter.filedialog import *
