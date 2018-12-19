@@ -74,8 +74,6 @@ class Notepod:
 
         self.textArea.bind('<Button-3>', self.rightClickMenu)
 
-        #self.mainframe.place(x = 0, y = 0, fill = BOTH, expand = 1)
-
         self.mainframe.pack(fill = BOTH, expand = 1)
 
 
@@ -125,6 +123,8 @@ class Notepod:
         self.tags[tag.tagname] = tag
         # increment the tag naming counter
         self.tagid += 1
+    
+    
     def showTagInfo(self, event, tag):
         
         if self.taginfo is not None : return
@@ -137,7 +137,7 @@ class Notepod:
         Label(self.taginfo, bg = tag.color, text = "Tag Text: {}".format(tag.text)).pack()
 
         self.taginfo.place(x = event.x, y = event.y + 10)
-        self.taginfo.tkraise()
+        self.taginfo.tkraise() 
 
     def hideTagInfo(self):
         if self.taginfo:
@@ -159,13 +159,11 @@ class Notepod:
         finally:
             file.close()
         
-        '''
-        self.textArea.tag_add("tag1", '1.0', '1.5')
-        self.textArea.tag_config("tag1", background="yellow", foreground="red")
-        '''
+       
 
     def saveFile(self):
-        # if we currently have opened a  file 
+        # if we currently have opened a file, we just save. 
+        # Otherwise, we have to save the file as
         if self.currentfile:
             try:
                 f = open(self.currentfile, "w")
