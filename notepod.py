@@ -15,14 +15,17 @@ class Notepod:
     def __init__(self):
         #Δημιουργία παραθύρου
         self.root = tk.Tk()
+
+        self.mainframe = tk.Frame(self.root)
+        
         #Αλλαγή Τίτλου Παραθύρου
         self.root.title('Notepod')
 
         #Αλλαγή Μεγέθους Παραθύρου
         self.root.geometry('600x600')
 
-        self.root.grid_rowconfigure(0, weight = 1)
-        self.root.grid_columnconfigure(0, weight = 1)
+        self.mainframe.grid_rowconfigure(0, weight = 1)
+        self.mainframe.grid_columnconfigure(0, weight = 1)
 
         self.tagid = 0
 
@@ -32,11 +35,11 @@ class Notepod:
 
         #TextArea
 
-        self.textArea = tk.Text(self.root, font = 'Times')
+        self.textArea = tk.Text(self.mainframe, font = 'Times')
         self.textArea.grid(row = 0, column = 0, sticky = NSEW, padx = 2, pady = 2)
         
         #Scrollbar
-        self.scrollbar = Scrollbar(self.root, command = self.textArea.yview)
+        self.scrollbar = Scrollbar(self.mainframe, command = self.textArea.yview)
         self.scrollbar.grid(row = 0, column = 1, sticky = NSEW)
 
         self.textArea.config(yscrollcommand = self.scrollbar.set)
@@ -71,13 +74,17 @@ class Notepod:
 
         self.textArea.bind('<Button-3>', self.rightClickMenu)
 
+        #self.mainframe.place(x = 0, y = 0, fill = BOTH, expand = 1)
+
+        self.mainframe.pack(fill = BOTH, expand = 1)
+
 
         # Tagging 
 
         self.tags = {}
 
 
-
+        self.taginfo = None
         
 
         #Έναρξη βρόγχου παραθύρου
@@ -113,19 +120,30 @@ class Notepod:
         self.textArea.tag_add(tag.tagname, SEL_FIRST, SEL_LAST)
         self.textArea.tag_configure(tag.tagname,  background = tag.color, foreground = 'red')
         self.textArea.tag_bind(tag.tagname, "<Enter>", lambda event: self.showTagInfo(event, tag.tagname))
-        self.textArea.tag_bind(tag.tagname, "<Leave>", lambda event: self.taginfo.destroy())
+        self.textArea.tag_bind(tag.tagname, "<Leave>", lambda event: self.hideTagInfo())
 
         self.tags[tag.tagname] = tag
         # increment the tag naming counter
         self.tagid += 1
     def showTagInfo(self, event, tag):
-        tag = self.tags[tag]
-        self.taginfo = tk.Toplevel(self.root)
-        Label(self.taginfo, text = "Tag Name: {}".format(tag.tagname)).pack()
-        Label(self.taginfo, text = "Tag Author: {}".format(tag.auth)).pack()
-        Label(self.taginfo, text = "Tag Text: {}".format(tag.text)).pack()
         
+        if self.taginfo is not None : return
+        tag = self.tags[tag]
+       
+        
+        self.taginfo = tk.Frame(self.root, height = 100, width = 100, bg = tag.color)
+        Label(self.taginfo, bg = tag.color, text = "Tag Name: {}".format(tag.tagname)).pack()
+        Label(self.taginfo, bg = tag.color, text = "Tag Author: {}".format(tag.auth)).pack()
+        Label(self.taginfo, bg = tag.color, text = "Tag Text: {}".format(tag.text)).pack()
 
+        self.taginfo.place(x = event.x, y = event.y + 10)
+        self.taginfo.tkraise()
+
+    def hideTagInfo(self):
+        if self.taginfo:
+            self.mainframe.tkraise()
+            self.taginfo.destroy()
+            self.taginfo = None
 
 
     def openFile(self):
