@@ -69,7 +69,7 @@ class Notepod:
 
 
         self.appMenu.add_cascade(label="File", menu= filemenu)
-        self.appMenu.add_cascade(label="File", menu= editMenu)
+        self.appMenu.add_cascade(label="Edit", menu= editMenu)
         self.appMenu.add_cascade(label="View", menu= viewMenu)
         self.root.config(menu = self.appMenu)
 
