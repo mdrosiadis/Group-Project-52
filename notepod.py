@@ -44,12 +44,13 @@ class Notepod:
         self.scrollbar.grid(row = 0, column = 1, sticky = NSEW)
 
         self.textArea.config(yscrollcommand = self.scrollbar.set)
-        
+        self.textArea.config(undo = True)
 
         #Μενου Εφαρμογης
         self.appMenu = tk.Menu(self.root)
 
         filemenu = Menu(self.appMenu, tearoff=0)
+        filemenu.add_command(label="New", command = self.newFile)
         filemenu.add_command(label="Open", command = self.openFile)
         filemenu.add_command(label="Save", command = self.saveFile)
         filemenu.add_command(label="Save As", command = self.saveFileAs)
@@ -57,7 +58,7 @@ class Notepod:
         filemenu.add_command(label="Exit", command= self.root.quit)
 
         editMenu = Menu(self.appMenu, tearoff = 0)
-        editMenu.add_command(label = 'Undo')
+        editMenu.add_command(label = 'Undo', command = self.textArea.edit_undo)
         editMenu.add_separator()
         editMenu.add_command(label = 'Copy' , command = lambda: self.textArea.event_generate("<<Copy>>" ))
         editMenu.add_command(label = 'Cut'  , command = lambda: self.textArea.event_generate("<<Cut>>"  ))
@@ -80,21 +81,20 @@ class Notepod:
 
         # Tagging 
 
-        self.tags = {}
-
-
-        self.taginfo = None
+        self.tags = []
         
-
+        self.newFile()
+        
         #Έναρξη βρόγχου παραθύρου
         self.root.mainloop()
 
 
     def rightClickMenu(self, event):
         print(self.textArea.tag_names())
+       
         # display the popup menu
         editMenu = Menu(self.textArea, tearoff = 0)
-        editMenu.add_command(label = 'Undo')
+        editMenu.add_command(label = 'Undo', command = self.textArea.edit_undo)
         editMenu.add_separator()
         editMenu.add_command(label = 'Copy' , command = lambda: self.textArea.event_generate("<<Copy>>" ))
         editMenu.add_command(label = 'Cut'  , command = lambda: self.textArea.event_generate("<<Cut>>"  ))
@@ -117,49 +117,79 @@ class Notepod:
             print("Dialog Canceled")
             return # dialog canceled
         self.textArea.tag_add(tag.tagname, SEL_FIRST, SEL_LAST)
-        self.textArea.tag_configure(tag.tagname,  background = tag.color, foreground = 'red')
-        self.textArea.tag_bind(tag.tagname, "<Enter>", lambda event: self.showTagInfo(event, tag.tagname))
-        self.textArea.tag_bind(tag.tagname, "<Leave>", lambda event: self.hideTagInfo())
+        self.textArea.tag_configure(tag.tagname,  background = tag.color)
+        #self.textArea.tag_bind(tag.tagname, "<Enter>", lambda event: self.showTagInfo(event, tag.tagname))
+        #self.textArea.tag_bind(tag.tagname, "<Leave>", lambda event: self.hideTagInfo())
 
-        self.tags[tag.tagname] = tag
+        self.textArea.tag_bind(tag.tagname, "<Enter>", tag.showinfo)
+        self.textArea.tag_bind(tag.tagname, "<Leave>", tag.hideinfo)
+        
+        self.tags.append(tag)       
+        
         # increment the tag naming counter
         self.tagid += 1
-    
-    
-    def showTagInfo(self, event, tag):
-        
-        if self.taginfo is not None : return
-        tag = self.tags[tag]
-       
-        
-        self.taginfo = tk.Frame(self.root, height = 100, width = 100, bg = tag.color)
-        Label(self.taginfo, bg = tag.color, text = "Tag Name: {}".format(tag.tagname)).pack()
-        Label(self.taginfo, bg = tag.color, text = "Tag Author: {}".format(tag.auth)).pack()
-        Label(self.taginfo, bg = tag.color, text = "Tag Text: {}".format(tag.text)).pack()
-
-        self.taginfo.place(x = event.x, y = event.y + 10)
-        self.taginfo.tkraise() 
-
-    def hideTagInfo(self):
-        if self.taginfo:
-            self.mainframe.tkraise()
-            self.taginfo.destroy()
-            self.taginfo = None
 
 
     def openFile(self):
         self.currentfile = askopenfilename(defaultextension=".txt", 
                                       filetypes=[("All Files","*.*"), 
                                         ("Text Documents","*.txt")]) 
+        self.textArea.tag_delete(self.textArea.tag_names())
+        self.tags = []
         try :
             file = open(self.currentfile, 'r')
+            self.textArea.tag_delete([t.tagname for t in self.tags])
             self.textArea.delete(1.0, END)
-            self.textArea.insert(1.0 , file.read())
-        except:
+            pendingTags = [] 
+            if file.readline().strip() == "#TAGINFOSTART#":
+                while True:
+                    line = file.readline().strip()
+
+                    if line == '': 
+                        file.seek(0)
+                        break
+                    
+                    if line[0] != '#' or line[-1] != '#':
+                        #raise Exception() # corrupted data
+                        file.seek(0)
+                        break
+                    else :
+                        line = line[1:-1] # removing '#'
+                    
+                    if line == 'TAGINFOEND' : break # all tag data were collected
+                    
+                    pendingTags.append(line.split('~'))
+                    
+            else:
+                file.seek(0)
+            self.textArea.delete('1.0', END)
+            self.textArea.insert('1.0' , file.read())
+
+            for tagdata in pendingTags:
+                
+                print(tagdata)
+                t = self.createTag(tagdata[0], tagdata[1], tagdata[2], tagdata[3])
+                self.tags.append(t)
+                self.textArea.tag_add(t.tagname, tagdata[4], tagdata[5])
+                self.textArea.tag_configure(t.tagname,  background = t.color)
+                
+
+                self.textArea.tag_bind(t.tagname, "<Enter>", t.showinfo)
+                self.textArea.tag_bind(t.tagname, "<Leave>", t.hideinfo)
+
+                self.textArea.tag_raise(t.tagname)
+
+            self.root.title("{} - Notepod".format(self.currentfile))
+            
+                
+
+        except Exception as e:
             print("Error opening file :", self.currentfile)
+            print(e)
         finally:
             file.close()
         
+       
        
 
     def saveFile(self):
@@ -168,6 +198,18 @@ class Notepod:
         if self.currentfile:
             try:
                 f = open(self.currentfile, "w")
+                # Save Tags
+                
+                if len(self.tags) > 0:
+                    f.write("#TAGINFOSTART#\n")
+                    for currentTag in self.tags:
+                        if currentTag == 'sel': continue
+                        
+                        limits = self.textArea.tag_ranges(currentTag.tagname)
+                        if len(limits) != 2 : continue
+                        # TAGINFO FORMAT ---> #tagname~tagauthor~tagtext~tagcolor~tagstart~tagend#
+                        f.write('#{}~{}~{}~{}~{}~{}#\n'.format(currentTag.tagname, currentTag.auth, currentTag.text, currentTag.color, str(limits[0]), str(limits[1])))
+                f.write("#TAGINFOEND#\n")
                 f.write(self.textArea.get("1.0", END))
                 f.close()
             except Exception as e:
@@ -179,11 +221,22 @@ class Notepod:
 
         f = asksaveasfile(mode = "w", filetypes = (('All Files', ''), ('Text Files', '.txt')), defaultextension = '.txt', initialfile = 'Document.txt')
         if f:
-            f.write(self.textArea.get('1.0', END))
-
             self.currentfile = f.name
-            f.close()
+            self.saveFile()
+    
+    def newFile(self):
+        if self.currentfile is not None:
+            print('Alert!')
         
+        self.currentfile = None
+        self.root.title('Untitled - Notepod')
+        self.textArea.tag_delete([t.tagname for t in self.tags])
+        self.textArea.delete('1.0', END)
+    def createTag(self, title, auth, text, color):
+        t = Tag(title, auth, text, color)
+        t.root = self.root
+        self.tags.append(t)
+        return t
 
 
 class TagCreator(simpledialog.Dialog):
@@ -215,16 +268,9 @@ class TagCreator(simpledialog.Dialog):
 
     def apply(self):
         self.tag = Tag(self.titleEntry.get(), self.authorEntry.get(), self.textEntry.get(), self.color)
+        self.tag.root = self._root()
         return 
         
-
-
-
-
-
-
-
-
 
 
 class Tag:
@@ -234,6 +280,21 @@ class Tag:
         self.auth = auth
         self.color = color
         self.text = text
+    
+    def showinfo(self, event):
+        self.taginfo = tk.Frame(self.root, height = 100, width = 100, bg = self.color)
+        Label(self.taginfo, bg = self.color, text = "Tag Name: {}".format(self.tagname)).pack()
+        Label(self.taginfo, bg = self.color, text = "Tag Author: {}".format(self.auth)).pack()
+        Label(self.taginfo, bg = self.color, text = "Tag Text: {}".format(self.text)).pack()
+
+        self.taginfo.place(x = event.x, y = event.y + 10)
+        self.taginfo.tkraise() 
+
+    def hideinfo(self, event):
+        self.taginfo.destroy()
+    
+    def __str__(self):
+        return "Name: {}\nAuthor: {}\nText: {}\nColor: {}".format(self.tagname, self.auth, self.text, self.color)
         
 
     
