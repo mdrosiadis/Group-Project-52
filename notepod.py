@@ -118,9 +118,7 @@ class Notepod:
             return # dialog canceled
         self.textArea.tag_add(tag.tagname, SEL_FIRST, SEL_LAST)
         self.textArea.tag_configure(tag.tagname,  background = tag.color)
-        #self.textArea.tag_bind(tag.tagname, "<Enter>", lambda event: self.showTagInfo(event, tag.tagname))
-        #self.textArea.tag_bind(tag.tagname, "<Leave>", lambda event: self.hideTagInfo())
-
+      
         self.textArea.tag_bind(tag.tagname, "<Enter>", tag.showinfo)
         self.textArea.tag_bind(tag.tagname, "<Leave>", tag.hideinfo)
         
@@ -169,7 +167,6 @@ class Notepod:
             for tagdata in pendingTags:
 
                 t = self.createTag(tagdata[0], tagdata[1], tagdata[2], tagdata[3])
-                self.tags.append(t)
                 self.textArea.tag_add(t.tagname, tagdata[4], tagdata[5])
                 self.textArea.tag_configure(t.tagname,  background = t.color)
                 
@@ -177,7 +174,6 @@ class Notepod:
                 self.textArea.tag_bind(t.tagname, "<Enter>", t.showinfo)
                 self.textArea.tag_bind(t.tagname, "<Leave>", t.hideinfo)
 
-                self.textArea.tag_raise(t.tagname)
 
             self.root.title("{} - Notepod".format(self.currentfile))
             
