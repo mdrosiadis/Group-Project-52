@@ -3,7 +3,7 @@ import tkinter as tk
 import os
 from tkinter.filedialog import *
 
-from tkinter import colorchooser, simpledialog
+from tkinter import colorchooser, simpledialog, messagebox
 
 from tkinter import *
 
@@ -55,7 +55,7 @@ class Notepod:
         filemenu.add_command(label="Save", command = self.saveFile)
         filemenu.add_command(label="Save As", command = self.saveFileAs)
         filemenu.add_separator()
-        filemenu.add_command(label="Exit", command= self.root.quit)
+        filemenu.add_command(label="Exit", command= self.exit)
 
         editMenu = Menu(self.appMenu, tearoff = 0)
         editMenu.add_command(label = 'Undo', command = self.textArea.edit_undo)
@@ -75,6 +75,8 @@ class Notepod:
         self.root.config(menu = self.appMenu)
 
         self.textArea.bind('<Button-3>', self.rightClickMenu)
+        self.root.protocol("WM_DELETE_WINDOW", self.exit)
+        
 
         self.mainframe.pack(fill = BOTH, expand = 1)
 
@@ -84,13 +86,12 @@ class Notepod:
         self.tags = []
         
         self.newFile()
-        
+
         #Έναρξη βρόγχου παραθύρου
         self.root.mainloop()
 
 
     def rightClickMenu(self, event):
-        print(self.textArea.tag_names())
        
         # display the popup menu
         editMenu = Menu(self.textArea, tearoff = 0)
@@ -114,7 +115,6 @@ class Notepod:
         tag = TagCreator(self.root).tag
         # add the tag
         if tag is None:
-            print("Dialog Canceled")
             return # dialog canceled
         self.textArea.tag_add(tag.tagname, SEL_FIRST, SEL_LAST)
         self.textArea.tag_configure(tag.tagname,  background = tag.color)
@@ -131,6 +131,7 @@ class Notepod:
 
 
     def openFile(self):
+        if self.onFileClose() == False : return
         self.currentfile = askopenfilename(defaultextension=".txt", 
                                       filetypes=[("All Files","*.*"), 
                                         ("Text Documents","*.txt")]) 
@@ -166,8 +167,7 @@ class Notepod:
             self.textArea.insert('1.0' , file.read())
 
             for tagdata in pendingTags:
-                
-                print(tagdata)
+
                 t = self.createTag(tagdata[0], tagdata[1], tagdata[2], tagdata[3])
                 self.tags.append(t)
                 self.textArea.tag_add(t.tagname, tagdata[4], tagdata[5])
@@ -183,12 +183,11 @@ class Notepod:
             
                 
 
-        except Exception as e:
-            print("Error opening file :", self.currentfile)
-            print(e)
+        except:
+            messagebox.showerror('Notepod', "Error opening file : {}".format(self.currentfile))
         finally:
             file.close()
-        
+
        
        
 
@@ -203,17 +202,16 @@ class Notepod:
                 if len(self.tags) > 0:
                     f.write("#TAGINFOSTART#\n")
                     for currentTag in self.tags:
-                        if currentTag == 'sel': continue
-                        
                         limits = self.textArea.tag_ranges(currentTag.tagname)
                         if len(limits) != 2 : continue
                         # TAGINFO FORMAT ---> #tagname~tagauthor~tagtext~tagcolor~tagstart~tagend#
                         f.write('#{}~{}~{}~{}~{}~{}#\n'.format(currentTag.tagname, currentTag.auth, currentTag.text, currentTag.color, str(limits[0]), str(limits[1])))
-                f.write("#TAGINFOEND#\n")
+                    f.write("#TAGINFOEND#\n")
                 f.write(self.textArea.get("1.0", END))
+                self.textArea.edit_modified(False)
                 f.close()
-            except Exception as e:
-                print(e)
+            except:
+                messagebox.showerror('Notepod', 'Error saving {}'.format(self.currentfile))
         else :
             self.saveFileAs()
     
@@ -225,19 +223,36 @@ class Notepod:
             self.saveFile()
     
     def newFile(self):
-        if self.currentfile is not None:
-            print('Alert!')
+        
+        self.onFileClose()
         
         self.currentfile = None
         self.root.title('Untitled - Notepod')
         self.textArea.tag_delete([t.tagname for t in self.tags])
         self.textArea.delete('1.0', END)
+        self.textArea.edit_modified(False)
+    
     def createTag(self, title, auth, text, color):
         t = Tag(title, auth, text, color)
         t.root = self.root
         self.tags.append(t)
         return t
 
+    def onFileClose(self):
+        # Returns True if we can exit / open new file, False otherwise
+        if self.textArea.edit_modified():
+            ans = messagebox.askyesnocancel('Notepod', 'Unsaved Changes. Save?')
+            
+            if ans == True:
+                self.saveFile()
+                return True
+            if ans == False: return True
+            if ans is None: return False
+        else:
+            return True
+            
+    def exit(self):
+        if self.onFileClose(): self.root.destroy()
 
 class TagCreator(simpledialog.Dialog):
 
