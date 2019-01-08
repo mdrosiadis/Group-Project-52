@@ -17,8 +17,10 @@ class Notepod:
         #Δημιουργία παραθύρου
         self.root = tk.Tk()
 
-        self.mainframe = tk.Frame(self.root)
-        
+        self.mainframe = tk.Frame(self.root, width = 500)
+        #self.tagFrame = tk.Frame(self.root, width = 100, background = 'yellow')
+        self.tagFrame = ButtonListFrame(self.root)
+
         #Αλλαγή Τίτλου Παραθύρου
         self.root.title('Notepod')
 
@@ -32,7 +34,6 @@ class Notepod:
 
         # Τρεχον Αρχειο
         self.currentfile = None 
-       
 
         #TextArea
 
@@ -78,8 +79,9 @@ class Notepod:
         self.root.protocol("WM_DELETE_WINDOW", self.exit)
         
 
-        self.mainframe.pack(fill = BOTH, expand = 1)
-
+        
+        self.tagFrame.pack(side = RIGHT, fill = BOTH)
+        self.mainframe.pack(side = LEFT, fill = BOTH, expand = 1)
 
         # Tagging 
 
@@ -107,12 +109,16 @@ class Notepod:
         
             editMenu.grab_release()
     
-    def addTag(self):
+    def addTag(self, name = None):
         
         #if nothin is selected, just do nothing
         if SEL_FIRST == SEL_LAST:return
-        
-        tag = TagCreator(self.root).tag
+        if name is not None:
+            tag = self.createTag(name,"","","") # we will get other data later
+        else:
+            tag = TagCreator(self.root).tag
+            tag = self.createTag(tag.tagname, tag.auth, tag.text, tag.color)
+
         # add the tag
         if tag is None:
             return # dialog canceled
@@ -120,9 +126,7 @@ class Notepod:
         self.textArea.tag_configure(tag.tagname,  background = tag.color)
       
         self.textArea.tag_bind(tag.tagname, "<Enter>", tag.showinfo)
-        self.textArea.tag_bind(tag.tagname, "<Leave>", tag.hideinfo)
-        
-        self.tags.append(tag)       
+        self.textArea.tag_bind(tag.tagname, "<Leave>", tag.hideinfo)      
         
         # increment the tag naming counter
         self.tagid += 1
@@ -167,12 +171,14 @@ class Notepod:
             for tagdata in pendingTags:
 
                 t = self.createTag(tagdata[0], tagdata[1], tagdata[2], tagdata[3])
-                self.textArea.tag_add(t.tagname, tagdata[4], tagdata[5])
-                self.textArea.tag_configure(t.tagname,  background = t.color)
+                pairs = tagdata[4:]
+                for i in range(len(pairs))[::2]:
+                    self.textArea.tag_add(t.tagname, pairs[i], pairs[i+1])
+                    self.textArea.tag_configure(t.tagname,  background = t.color)
                 
 
-                self.textArea.tag_bind(t.tagname, "<Enter>", t.showinfo)
-                self.textArea.tag_bind(t.tagname, "<Leave>", t.hideinfo)
+                    self.textArea.tag_bind(t.tagname, "<Enter>", t.showinfo)
+                    self.textArea.tag_bind(t.tagname, "<Leave>", t.hideinfo)
 
 
             self.root.title("{} - Notepod".format(self.currentfile))
@@ -199,9 +205,12 @@ class Notepod:
                     f.write("#TAGINFOSTART#\n")
                     for currentTag in self.tags:
                         limits = self.textArea.tag_ranges(currentTag.tagname)
-                        if len(limits) != 2 : continue
-                        # TAGINFO FORMAT ---> #tagname~tagauthor~tagtext~tagcolor~tagstart~tagend#
-                        f.write('#{}~{}~{}~{}~{}~{}#\n'.format(currentTag.tagname, currentTag.auth, currentTag.text, currentTag.color, str(limits[0]), str(limits[1])))
+                        #if len(limits) != 2 : continue
+                        # TAGINFO FORMAT ---> #tagname~tagauthor~tagtext~tagcolor~tagstart1~tagend1~tagstart2~tagend2# etc
+                        f.write('#{}~{}~{}~{}'.format(currentTag.tagname, currentTag.auth, currentTag.text, currentTag.color))
+                        for i in limits:
+                            f.write('~{}'.format(str(i)))
+                        f.write('#\n')
                     f.write("#TAGINFOEND#\n")
                 f.write(self.textArea.get("1.0", END))
                 self.textArea.edit_modified(False)
@@ -229,9 +238,18 @@ class Notepod:
         self.textArea.edit_modified(False)
     
     def createTag(self, title, auth, text, color):
-        t = Tag(title, auth, text, color)
-        t.root = self.root
-        self.tags.append(t)
+        
+        tmp = [i.tagname for i in self.tags]
+        # if there is not a tag name as this one, append this tag in the list and create a new button
+        # Otherwise just return the tag
+        if title in tmp:
+            t = self.tags[tmp.index(title)]
+        else:
+            t = Tag(title, auth, text, color)
+            t.root = self.root
+            self.tags.append(t)
+            self.tagFrame.addButton(t, self.addTag)
+
         return t
 
     def onFileClose(self):
@@ -241,11 +259,16 @@ class Notepod:
             
             if ans == True:
                 self.saveFile()
-                return True
-            if ans == False: return True
-            if ans is None: return False
+                toReturn = True
+            if ans == False: toReturn = True
+            if ans is None: toReturn = False
         else:
-            return True
+            toReturn =  True
+
+        if toReturn:
+            self.tagFrame.clearButtons()
+        
+        return toReturn
             
     def exit(self):
         if self.onFileClose(): self.root.destroy()
@@ -268,7 +291,7 @@ class TagCreator(simpledialog.Dialog):
         self.authorEntry.grid(row = 1, column = 1)
         self.textEntry.grid(row = 2, column = 1)
 
-        self.color = None
+        self.color = '#ffff00'
 
         self.pickColorButton = Button(master, text = 'Pick Color', command = self.pickColor)
         self.pickColorButton.grid(row = 3, column = 1)
@@ -303,11 +326,34 @@ class Tag:
 
     def hideinfo(self, event):
         self.taginfo.destroy()
+
+    def __eq__(self, other):
+        return self.tagname == other.tagname
     
     def __str__(self):
         return "Name: {}\nAuthor: {}\nText: {}\nColor: {}".format(self.tagname, self.auth, self.text, self.color)
         
+class ButtonListFrame(tk.Frame):
 
+    def __init__(self, master):
+        self.master = master
+        super().__init__(self.master, width =100, bg = 'skyblue')
+        tk.Label(self, text = 'Labels', bg = 'skyblue', font = 'Arial 24').pack(side = TOP, fill = X)
+        self.buttons = []
+        
+        
+    
+    def addButton(self, tag, func):
+        b = tk.Button(self, text = tag.tagname, bg = tag.color, wraplength = 100, command = lambda : func(name = tag.tagname))
+        b.pack(side = TOP, fill = X)
+        self.buttons.append(b)
+
+    def clearButtons(self):
+        for button in self.buttons:
+            button.destroy()
+
+   
+        
     
 
 
