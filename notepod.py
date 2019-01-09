@@ -372,6 +372,9 @@ class Tag:
         self.active = True
     
     def showinfo(self, event):
+        if not self.active:
+            self.taginfo = None
+            return
         self.taginfo = tk.Frame(self.root, height = 100, width = 100, bg = self.color)
         Label(self.taginfo, bg = self.color, text = "Tag Name: {}".format(self.tagname)).pack()
         Label(self.taginfo, bg = self.color, text = "Tag Author: {}".format(self.auth)).pack()
@@ -381,6 +384,7 @@ class Tag:
         self.taginfo.tkraise() 
 
     def hideinfo(self, event):
+        if self.taginfo is None: return
         self.taginfo.destroy()
 
     def __eq__(self, other):
@@ -416,4 +420,4 @@ class ButtonListFrame(tk.Frame):
 app = Notepod()
 
 
-   
+    
