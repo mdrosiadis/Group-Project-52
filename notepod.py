@@ -18,8 +18,8 @@ class Notepod:
         self.root = tk.Tk()
 
         self.mainframe = tk.Frame(self.root, width = 500)
-        #self.tagFrame = tk.Frame(self.root, width = 100, background = 'yellow')
         self.tagFrame = ButtonListFrame(self.root)
+        
 
         #Αλλαγή Τίτλου Παραθύρου
         self.root.title('Notepod')
@@ -56,6 +56,7 @@ class Notepod:
         filemenu.add_command(label="Save", command = self.saveFile)
         filemenu.add_command(label="Save As", command = self.saveFileAs)
         filemenu.add_separator()
+        filemenu.add_command(label = 'Change User', command = self.setUser)
         filemenu.add_command(label="Exit", command= self.exit)
 
         editMenu = Menu(self.appMenu, tearoff = 0)
@@ -68,24 +69,35 @@ class Notepod:
         viewMenu = Menu(self.appMenu, tearoff = 0)
         viewMenu.add_command(label = 'Font', command = lambda : self.textArea.config(font = 'Arial 40'))
 
+        aboutMenu = Menu(self.appMenu, tearoff = 0)
+        aboutMenu.add_command(label = 'About Notepod', command = self.aboutInfo)
 
 
-        self.appMenu.add_cascade(label="File", menu= filemenu)
-        self.appMenu.add_cascade(label="Edit", menu= editMenu)
-        self.appMenu.add_cascade(label="View", menu= viewMenu)
+
+        self.appMenu.add_cascade(label = "File" , menu = filemenu )
+        self.appMenu.add_cascade(label = "Edit" , menu = editMenu )
+        self.appMenu.add_cascade(label = "View" , menu = viewMenu )
+        self.appMenu.add_cascade(label = "About", menu = aboutMenu)
         self.root.config(menu = self.appMenu)
 
         self.textArea.bind('<Button-3>', self.rightClickMenu)
         self.root.protocol("WM_DELETE_WINDOW", self.exit)
         
-
-        
-        self.tagFrame.pack(side = RIGHT, fill = BOTH)
-        self.mainframe.pack(side = LEFT, fill = BOTH, expand = 1)
+       
 
         # Tagging 
 
         self.tags = []
+
+        self.currentUser = 'Default User'
+        self.statusBarString = tk.StringVar()
+        self.statusBarString.set('Editing as Default User')
+
+        self.statusBar = tk.Label(self.root, textvariable = self.statusBarString, relief = SUNKEN, anchor = W)
+        self.statusBar.pack(fill = X, side = BOTTOM, anchor = W)
+
+        self.tagFrame.pack(side = RIGHT, fill = BOTH)
+        self.mainframe.pack(side = LEFT, fill = BOTH, expand = 1)
         
         self.newFile()
 
@@ -112,11 +124,12 @@ class Notepod:
     def addTag(self, name = None):
         
         #if nothin is selected, just do nothing
-        if SEL_FIRST == SEL_LAST:return
+        if SEL_FIRST == SEL_LAST: return
         if name is not None:
             tag = self.createTag(name,"","","") # we will get other data later
         else:
-            tag = TagCreator(self.root).tag
+            tag = TagCreator(self.root, self.currentUser).tag
+            if tag is None: return # not data returned
             tag = self.createTag(tag.tagname, tag.auth, tag.text, tag.color)
 
         # add the tag
@@ -137,7 +150,6 @@ class Notepod:
         self.currentfile = askopenfilename(defaultextension=".txt", 
                                       filetypes=[("All Files","*.*"), 
                                         ("Text Documents","*.txt")]) 
-        self.textArea.tag_delete(self.textArea.tag_names())
         self.tags = []
         try :
             file = open(self.currentfile, 'r')
@@ -230,12 +242,8 @@ class Notepod:
     def newFile(self):
         
         self.onFileClose()
-        
-        self.currentfile = None
         self.root.title('Untitled - Notepod')
-        self.textArea.tag_delete([t.tagname for t in self.tags])
-        self.textArea.delete('1.0', END)
-        self.textArea.edit_modified(False)
+        
     
     def createTag(self, title, auth, text, color):
         
@@ -248,7 +256,7 @@ class Notepod:
             t = Tag(title, auth, text, color)
             t.root = self.root
             self.tags.append(t)
-            self.tagFrame.addButton(t, self.addTag)
+            self.tagFrame.addButton(t, self.toggleTag)
 
         return t
 
@@ -267,16 +275,59 @@ class Notepod:
 
         if toReturn:
             self.tagFrame.clearButtons()
+            self.textArea.tag_delete(self.textArea.tag_names())
+            self.textArea.delete('1.0', END)
+            self.textArea.edit_modified(False)
+            self.tags = []
+            self.currentfile = None
         
         return toReturn
             
     def exit(self):
         if self.onFileClose(): self.root.destroy()
 
-class TagCreator(simpledialog.Dialog):
+    def setUser(self):
+        t = simpledialog.askstring('Notepod', 'Current user: ')
+        if t is not None:
+            self.currentUser = t
+        else:
+            self.currentUser = 'Default User'
+        self.statusBarString.set('Editing as {}'.format(self.currentUser))
 
+    def aboutInfo(self):
+        
+        win = tk.Toplevel(self.root)
+        win.title('About Notepod')
+        win.resizable(0,0)
+        f = tk.Frame(win, width = 200, height = 300)
+        txt = tk.Text(f, font = 'Arial 14', background = 'white', width = 30, height = 15)
+        txt.tag_config('allign', justify = CENTER)
+        txt.insert('1.0', 'Notepod v1.0\n\nCreated on Python 3 and tkinter\nProject of Group 52\nClass: ECE_Y106, University of Patras\n' + 
+                        '\nGroup Members\n-----------\nΜιχάλης Δροσιάδης\nΜιχάλης Ταλιαντζής\nΓιάννης Ηλιόπουλος\nΣωτήρης Βόκολος\nΤζωρτζίνα Μέρκου\nΓιώργος Ρίπης\n\n', 'allign')
+        txt.config(state = DISABLED)
+        txt.pack(expand = 0)
+        f.pack()
+        win.mainloop()
+
+    def toggleTag(self, tag):
+        
+        if tag.active: 
+            self.textArea.tag_config(tag.tagname, background = '#ffffff')
+        else:
+            self.textArea.tag_config(tag.tagname, background = tag.color)
+
+        tag.active = not tag.active
+
+class TagCreator(simpledialog.Dialog):
+    
+    def __init__(self, master, user):
+        self.user = user
+        super().__init__(master)
+        
     def body(self, master):
         self.tag = None
+        self.resizable(0,0)
+        self.title('Add Tag - Notepod')
 
         Label(master, text = 'Tag Title:').grid(row = 0, column = 0)
         Label(master, text = 'Tag Author:').grid(row = 1, column = 0)
@@ -285,20 +336,24 @@ class TagCreator(simpledialog.Dialog):
 
         self.titleEntry = Entry(master)
         self.authorEntry = Entry(master)
+        self.authorEntry.insert(0, self.user)
         self.textEntry = Entry(master)
 
-        self.titleEntry.grid(row = 0, column = 1)
-        self.authorEntry.grid(row = 1, column = 1)
-        self.textEntry.grid(row = 2, column = 1)
+        self.titleEntry.grid(row = 0, column = 1, columnspan = 2)
+        self.authorEntry.grid(row = 1, column = 1, columnspan = 2)
+        self.textEntry.grid(row = 2, column = 1, columnspan = 2)
 
         self.color = '#ffff00'
 
         self.pickColorButton = Button(master, text = 'Pick Color', command = self.pickColor)
-        self.pickColorButton.grid(row = 3, column = 1)
+        self.colorPreview = tk.Canvas(master, width = 20, height = 20, background = self.color)
+        self.colorPreview.grid(row = 3, column = 1)
+        self.pickColorButton.grid(row = 3, column = 2)
 
     def pickColor(self):
 
         self.color = colorchooser.askcolor('yellow')[1]
+        self.colorPreview.config(background = self.color)
 
     def apply(self):
         self.tag = Tag(self.titleEntry.get(), self.authorEntry.get(), self.textEntry.get(), self.color)
@@ -314,6 +369,7 @@ class Tag:
         self.auth = auth
         self.color = color
         self.text = text
+        self.active = True
     
     def showinfo(self, event):
         self.taginfo = tk.Frame(self.root, height = 100, width = 100, bg = self.color)
@@ -338,14 +394,14 @@ class ButtonListFrame(tk.Frame):
     def __init__(self, master):
         self.master = master
         super().__init__(self.master, width =100, bg = 'skyblue')
-        tk.Label(self, text = 'Labels', bg = 'skyblue', font = 'Arial 24').pack(side = TOP, fill = X)
+        tk.Label(self, text = 'Toggle Tags', bg = 'skyblue', font = 'Arial 24').pack(side = TOP, fill = X)
         self.buttons = []
         
         
     
     def addButton(self, tag, func):
-        b = tk.Button(self, text = tag.tagname, bg = tag.color, wraplength = 100, command = lambda : func(name = tag.tagname))
-        b.pack(side = TOP, fill = X)
+        b = tk.Button(self, text = tag.tagname + ' by ' + tag.auth, bg = tag.color, wraplength = 100, command = lambda : func(tag))
+        b.pack(side = TOP, fill = X, pady = 10)
         self.buttons.append(b)
 
     def clearButtons(self):
@@ -360,4 +416,4 @@ class ButtonListFrame(tk.Frame):
 app = Notepod()
 
 
-    
+   
