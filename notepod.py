@@ -1,56 +1,68 @@
 # pylint: disable = W0614
 import tkinter as tk
-import os
 from tkinter.filedialog import *
-
 from tkinter import colorchooser, simpledialog, messagebox
 
+# Importing Wildcard to ease usage of Tcl/Tk constants/variables
 from tkinter import *
 
 
 
 class Notepod:
-#Κύρια κλάση του προγράμματος
+# Main Program Class
 
-    #κατασκευαστής κλάσης(constructor)
+    # Class Constructor
     def __init__(self):
-        #Δημιουργία παραθύρου
+        # Window Creation ----------------------------------------------------------------------------------------
         self.root = tk.Tk()
-
-        self.mainframe = tk.Frame(self.root, width = 500)
-        self.tagFrame = ButtonListFrame(self.root)
         
-
-        #Αλλαγή Τίτλου Παραθύρου
+        # Window Title
         self.root.title('Notepod')
 
-        #Αλλαγή Μεγέθους Παραθύρου
+        # Default Window size
         self.root.geometry('600x600')
 
+        # App Variables ------------------------------------------------------------------------------------------
+
+        self.bigfontOn = False
+        
+        # Tagging 
+
+        self.tags = []
+
+        self.currentUser = 'Default User'
+        self.statusBarString = tk.StringVar()
+        self.statusBarString.set('Editing as Default User')
+
+        # Current Opened File
+        self.currentfile = None 
+
+        # GUI Creattion ------------------------------------------------------------------------------------------
+
+        # Creating the 3 main Frames of the app
+        self.mainframe = tk.Frame(self.root, width = 500)
+        self.tagFrame = ButtonListFrame(self.root)
+        self.statusBar = tk.Label(self.root, textvariable = self.statusBarString, relief = SUNKEN, anchor = W)
+        
+        # Configuring Text - Scrollbar Geometry
         self.mainframe.grid_rowconfigure(0, weight = 1)
         self.mainframe.grid_columnconfigure(0, weight = 1)
 
-        self.tagid = 0
-
-        # Τρεχον Αρχειο
-        self.currentfile = None 
-
-        #TextArea
-
-        self.textArea = tk.Text(self.mainframe, font = 'Times')
+        # Main Text Area
+        self.textArea = tk.Text(self.mainframe, font = 'Arial 20')
         self.textArea.grid(row = 0, column = 0, sticky = NSEW, padx = 2, pady = 2)
         
-        #Scrollbar
-        self.scrollbar = Scrollbar(self.mainframe, command = self.textArea.yview)
+        # Text Area Scrollbar
+        self.scrollbar = tk.Scrollbar(self.mainframe, command = self.textArea.yview)
         self.scrollbar.grid(row = 0, column = 1, sticky = NSEW)
 
         self.textArea.config(yscrollcommand = self.scrollbar.set)
         self.textArea.config(undo = True)
 
-        #Μενου Εφαρμογης
+        # App Menu ----------------------------------------------------------------------------------------------
         self.appMenu = tk.Menu(self.root)
 
-        filemenu = Menu(self.appMenu, tearoff=0)
+        filemenu = tk.Menu(self.appMenu, tearoff=0)
         filemenu.add_command(label="New", command = self.newFile)
         filemenu.add_command(label="Open", command = self.openFile)
         filemenu.add_command(label="Save", command = self.saveFile)
@@ -59,17 +71,17 @@ class Notepod:
         filemenu.add_command(label = 'Change User', command = self.setUser)
         filemenu.add_command(label="Exit", command= self.exit)
 
-        editMenu = Menu(self.appMenu, tearoff = 0)
+        editMenu = tk.Menu(self.appMenu, tearoff = 0)
         editMenu.add_command(label = 'Undo', command = self.textArea.edit_undo)
         editMenu.add_separator()
         editMenu.add_command(label = 'Copy' , command = lambda: self.textArea.event_generate("<<Copy>>" ))
         editMenu.add_command(label = 'Cut'  , command = lambda: self.textArea.event_generate("<<Cut>>"  ))
         editMenu.add_command(label = 'Paste', command = lambda: self.textArea.event_generate("<<Paste>>"))
 
-        viewMenu = Menu(self.appMenu, tearoff = 0)
-        viewMenu.add_command(label = 'Font', command = lambda : self.textArea.config(font = 'Arial 40'))
+        viewMenu = tk.Menu(self.appMenu, tearoff = 0)
+        viewMenu.add_checkbutton(label = 'Big Font', command = self.toggleFont)
 
-        aboutMenu = Menu(self.appMenu, tearoff = 0)
+        aboutMenu = tk.Menu(self.appMenu, tearoff = 0)
         aboutMenu.add_command(label = 'About Notepod', command = self.aboutInfo)
 
 
@@ -80,41 +92,64 @@ class Notepod:
         self.appMenu.add_cascade(label = "About", menu = aboutMenu)
         self.root.config(menu = self.appMenu)
 
+        # Handle Right Clicks
         self.textArea.bind('<Button-3>', self.rightClickMenu)
+
+        # Make sure to check for unsaved changes if the window is forced to close
         self.root.protocol("WM_DELETE_WINDOW", self.exit)
         
        
 
-        # Tagging 
-
-        self.tags = []
-
-        self.currentUser = 'Default User'
-        self.statusBarString = tk.StringVar()
-        self.statusBarString.set('Editing as Default User')
-
-        self.statusBar = tk.Label(self.root, textvariable = self.statusBarString, relief = SUNKEN, anchor = W)
+        
+        # Packing onto main Window
+        
         self.statusBar.pack(fill = X, side = BOTTOM, anchor = W)
-
         self.tagFrame.pack(side = RIGHT, fill = BOTH)
         self.mainframe.pack(side = LEFT, fill = BOTH, expand = 1)
         
         self.newFile()
 
-        #Έναρξη βρόγχου παραθύρου
+        # Start the event handling loop
         self.root.mainloop()
 
+    def toggleFont(self):
+
+        if self.bigfontOn:
+            self.textArea.config(font = 'Arial 20')
+        else:
+            self.textArea.config(font = 'Arial 40')
+        
+        self.bigfontOn = not self.bigfontOn
+
+    def existingTagsMenu(self, parent):
+        
+        tagMenu = tk.Menu(parent, tearoff = 0)
+
+        for tag in self.tags:
+            tagMenu.add_command(label = tag.tagname, background = tag.color, command = lambda : self.addTag(tag.tagname))
+        return tagMenu
 
     def rightClickMenu(self, event):
-       
-        # display the popup menu
+        
+        # Create the tag specific menu 
         editMenu = Menu(self.textArea, tearoff = 0)
+        helperMenu = tk.Menu(editMenu, tearoff = 0)
+
+        helperMenu.add_cascade(label = 'Existing Tag', state = (DISABLED if len(self.tags) == 0 else NORMAL), menu = self.existingTagsMenu(helperMenu))
+        helperMenu.add_separator()
+        helperMenu.add_command(label = 'New Tag', command = self.addTag)
+
+        # Create the popup menu
+        
         editMenu.add_command(label = 'Undo', command = self.textArea.edit_undo)
         editMenu.add_separator()
         editMenu.add_command(label = 'Copy' , command = lambda: self.textArea.event_generate("<<Copy>>" ))
         editMenu.add_command(label = 'Cut'  , command = lambda: self.textArea.event_generate("<<Cut>>"  ))
         editMenu.add_command(label = 'Paste', command = lambda: self.textArea.event_generate("<<Paste>>"))
-        editMenu.add_command(label = 'Add Tag', command = self.addTag)
+        editMenu.add_separator()
+        editMenu.add_cascade(label = 'Add Tag', menu = helperMenu)
+
+        # Display the Menu
         try:
             editMenu.tk_popup(event.x_root, event.y_root, 0)
         finally:
@@ -141,8 +176,6 @@ class Notepod:
         self.textArea.tag_bind(tag.tagname, "<Enter>", tag.showinfo)
         self.textArea.tag_bind(tag.tagname, "<Leave>", tag.hideinfo)      
         
-        # increment the tag naming counter
-        self.tagid += 1
 
 
     def openFile(self):
@@ -165,7 +198,7 @@ class Notepod:
                         break
                     
                     if line[0] != '#' or line[-1] != '#':
-                        #raise Exception() # corrupted data
+                        # Corrupted  tag data
                         file.seek(0)
                         break
                     else :
@@ -179,6 +212,8 @@ class Notepod:
                 file.seek(0)
             self.textArea.delete('1.0', END)
             self.textArea.insert('1.0' , file.read())
+
+            # Adding Tags Gathered
 
             for tagdata in pendingTags:
 
@@ -217,7 +252,7 @@ class Notepod:
                     f.write("#TAGINFOSTART#\n")
                     for currentTag in self.tags:
                         limits = self.textArea.tag_ranges(currentTag.tagname)
-                        #if len(limits) != 2 : continue
+                        if len(limits) == 0 : continue # all tags of that kind were desroyed
                         # TAGINFO FORMAT ---> #tagname~tagauthor~tagtext~tagcolor~tagstart1~tagend1~tagstart2~tagend2# etc
                         f.write('#{}~{}~{}~{}'.format(currentTag.tagname, currentTag.auth, currentTag.text, currentTag.color))
                         for i in limits:
@@ -295,6 +330,7 @@ class Notepod:
         self.statusBarString.set('Editing as {}'.format(self.currentUser))
 
     def aboutInfo(self):
+        # Display app info
         
         win = tk.Toplevel(self.root)
         win.title('About Notepod')
@@ -318,6 +354,7 @@ class Notepod:
 
         tag.active = not tag.active
 
+# Class responsible to create the New Tag Dialog ------------------------------------------------------------------
 class TagCreator(simpledialog.Dialog):
     
     def __init__(self, master, user):
@@ -361,7 +398,7 @@ class TagCreator(simpledialog.Dialog):
         return 
         
 
-
+# Class responsible to create objects to store the tag specific data and display the info popups ---------------------
 class Tag:
 
     def __init__(self, title, auth, text, color):
@@ -387,12 +424,14 @@ class Tag:
         if self.taginfo is None: return
         self.taginfo.destroy()
 
+    # Python Calls - Created for debuging
     def __eq__(self, other):
         return self.tagname == other.tagname
     
     def __str__(self):
         return "Name: {}\nAuthor: {}\nText: {}\nColor: {}".format(self.tagname, self.auth, self.text, self.color)
-        
+
+# Class to handle the right side 'Tag Toggling' Box --------------------------------------------------------------------   
 class ButtonListFrame(tk.Frame):
 
     def __init__(self, master):
@@ -401,8 +440,6 @@ class ButtonListFrame(tk.Frame):
         tk.Label(self, text = 'Toggle Tags', bg = 'skyblue', font = 'Arial 24').pack(side = TOP, fill = X)
         self.buttons = []
         
-        
-    
     def addButton(self, tag, func):
         b = tk.Button(self, text = tag.tagname + ' by ' + tag.auth, bg = tag.color, wraplength = 100, command = lambda : func(tag))
         b.pack(side = TOP, fill = X, pady = 10)
@@ -413,10 +450,7 @@ class ButtonListFrame(tk.Frame):
             button.destroy()
 
    
-        
-    
-
-
+# Run Application
 app = Notepod()
 
 
