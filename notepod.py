@@ -99,7 +99,7 @@ class Notepod:
         self.root.protocol("WM_DELETE_WINDOW", self.exit)
         
        
-
+        Tag.setFunc(self.addTag)
         
         # Packing onto main Window
         
@@ -126,7 +126,7 @@ class Notepod:
         tagMenu = tk.Menu(parent, tearoff = 0)
 
         for tag in self.tags:
-            tagMenu.add_command(label = tag.tagname, background = tag.color, command = lambda : self.addTag(tag.tagname))
+            tagMenu.add_command(label = tag.tagname, background = tag.color, command = tag.newTag)
         return tagMenu
 
     def rightClickMenu(self, event):
@@ -401,6 +401,12 @@ class TagCreator(simpledialog.Dialog):
 # Class responsible to create objects to store the tag specific data and display the info popups ---------------------
 class Tag:
 
+    func = lambda name : None
+    @classmethod
+    def setFunc(cls, f):
+        cls.func = f
+
+
     def __init__(self, title, auth, text, color):
         self.tagname = title
         self.auth = auth
@@ -424,6 +430,8 @@ class Tag:
         if self.taginfo is None: return
         self.taginfo.destroy()
 
+    def newTag(self):
+        Tag.func(name = self.tagname)
     # Python Calls - Created for debuging
     def __eq__(self, other):
         return self.tagname == other.tagname
