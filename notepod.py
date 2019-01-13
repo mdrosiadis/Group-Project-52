@@ -134,6 +134,7 @@ class Notepod:
         # Create the tag specific menu 
         editMenu = Menu(self.textArea, tearoff = 0)
         helperMenu = tk.Menu(editMenu, tearoff = 0)
+        tagRemoveMenu = tk.Menu(editMenu, tearoff = 0)
 
         helperMenu.add_cascade(label = 'Existing Tag', state = (DISABLED if len(self.tags) == 0 else NORMAL), menu = self.existingTagsMenu(helperMenu))
         helperMenu.add_separator()
@@ -147,7 +148,44 @@ class Notepod:
         editMenu.add_command(label = 'Cut'  , command = lambda: self.textArea.event_generate("<<Cut>>"  ))
         editMenu.add_command(label = 'Paste', command = lambda: self.textArea.event_generate("<<Paste>>"))
         editMenu.add_separator()
-        editMenu.add_cascade(label = 'Add Tag', menu = helperMenu)
+
+        def isInside(i, start, end):
+            ''' This function checks if an index is inside a text area specified by start, end'''
+            i = [int(j) for j in i.split('.')]
+            start = [int(j) for j in start.split('.')]
+            end = [int(j) for j in end.split('.')]
+
+            if i[0] < start[0]: return False
+            if i[1] < start[1]: return False
+            if i[0] > end[0]  : return False
+            if i[1] > end[1]  : return False
+
+            return True
+
+        currentIndex = self.textArea.index(CURRENT)
+        foundFlag = False
+        lone = False
+
+        for tag in self.textArea.tag_names():
+            if tag == 'sel': continue
+            ranges = [str(item) for item in self.textArea.tag_ranges(tag)]
+            for i in range(len(ranges))[::2]:
+                if isInside(currentIndex, ranges[i], ranges[i+1]):
+                    if len(ranges) == 2: 
+                        lone = True
+                    foundFlag = True
+                    temprange = (ranges[i], ranges[i+1])
+                    break
+            if foundFlag : break
+        
+        if foundFlag:
+            tagRemoveMenu.add_cascade(label = 'From Here Only', command = lambda : self.removeTag(tag, start = temprange[0], end= temprange[1]))
+            tagRemoveMenu.add_cascade(label = 'Globaly', state = (DISABLED if lone else NORMAL), command = lambda : self.removeTag(tag))
+
+
+        editMenu.add_cascade(label = 'Add Tag', state = (DISABLED if foundFlag else NORMAL), menu = helperMenu)
+        editMenu.add_cascade(label = 'Remove Tag', state = (DISABLED if not foundFlag else NORMAL), menu = tagRemoveMenu)
+
 
         # Display the Menu
         try:
@@ -155,6 +193,22 @@ class Notepod:
         finally:
         
             editMenu.grab_release()
+
+    def removeTag(self, tagname, start = '1.0', end = END):
+        cleanUp = False
+        if len(self.textArea.tag_ranges(tagname)) == 2 or (start == '1.0' and end == END): 
+            cleanUp = True
+        
+        self.textArea.tag_remove(tagname, start, end)
+
+        if cleanUp:
+            tagnames = [t.tagname for t in self.tags]
+            if tagname in tagnames:
+                self.tags.pop(tagnames.index(tagname))
+                self.tagFrame.destroyButtonByName(tagname)
+
+    
+        
     
     def addTag(self, name = None):
         
@@ -174,8 +228,9 @@ class Notepod:
         self.textArea.tag_configure(tag.tagname,  background = tag.color)
       
         self.textArea.tag_bind(tag.tagname, "<Enter>", tag.showinfo)
-        self.textArea.tag_bind(tag.tagname, "<Leave>", tag.hideinfo)      
+        self.textArea.tag_bind(tag.tagname, "<Leave>", tag.hideinfo)
         
+# File Managment Methods  -------------------------------------------------------------------------------------------------------------
 
 
     def openFile(self):
@@ -446,16 +501,22 @@ class ButtonListFrame(tk.Frame):
         self.master = master
         super().__init__(self.master, width =100, bg = 'skyblue')
         tk.Label(self, text = 'Toggle Tags', bg = 'skyblue', font = 'Arial 24').pack(side = TOP, fill = X)
-        self.buttons = []
+        self.buttons = {}
         
     def addButton(self, tag, func):
         b = tk.Button(self, text = tag.tagname + ' by ' + tag.auth, bg = tag.color, wraplength = 100, command = lambda : func(tag))
         b.pack(side = TOP, fill = X, pady = 10)
-        self.buttons.append(b)
+        self.buttons[tag.tagname] = b 
 
     def clearButtons(self):
         for button in self.buttons:
-            button.destroy()
+            self.buttons[button].destroy()
+        self.buttons = {}
+
+    def destroyButtonByName(self, tagname):
+        if tagname in self.buttons:
+            self.buttons[tagname].destroy()
+            self.buttons.pop(tagname)
 
    
 # Run Application
